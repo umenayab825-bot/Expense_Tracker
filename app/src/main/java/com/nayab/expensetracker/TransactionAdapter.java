@@ -1,74 +1,65 @@
 package com.nayab.expensetracker;
 
-import android.graphics.Color;
+import android.content.Context;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ImageView;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
-import java.util.List;
+import java.util.ArrayList;
 
-// Agar aap delete feature implement karna chahte hain, toh yeh interface use hoga
-// public interface OnItemClickListener {
-//     void onItemLongClick(int transactionId);
-// }
+public class TransactionAdapter extends RecyclerView.Adapter<TransactionAdapter.TransactionViewHolder> {
 
-public class TransactionAdapter extends RecyclerView.Adapter<TransactionAdapter.ViewHolder> {
+    private ArrayList<Transaction> transactionList;
+    private OnItemLongClickListener listener;
 
-    private final List<Transaction> transactionList;
-    // private final OnItemClickListener listener; // Delete feature ke liye
+    public interface OnItemLongClickListener {
+        void onItemLongClick(Transaction transaction, View view);
+    }
 
-    public TransactionAdapter(List<Transaction> transactionList) {
+    public TransactionAdapter(ArrayList<Transaction> transactionList, OnItemLongClickListener listener) {
         this.transactionList = transactionList;
-        // this.listener = listener; // Agar delete listener use karna hai
+        this.listener = listener;
     }
 
     @NonNull
     @Override
-    public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        // row_transaction.xml ko connect karein
+    public TransactionViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+        // row_transaction.xml is used here
         View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.row_transaction, parent, false);
-        return new ViewHolder(view);
+        return new TransactionViewHolder(view);
     }
 
     @Override
-    public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
-        Transaction transaction = transactionList.get(position);
+    public void onBindViewHolder(@NonNull TransactionViewHolder holder, int position) {
+        Transaction currentItem = transactionList.get(position);
 
-        holder.textTitle.setText(transaction.getTitle());
-        holder.textCategory.setText(transaction.getCategory());
-        holder.textAmount.setText("Rs. " + transaction.getAmount());
+        holder.txtTitle.setText(currentItem.getTitle());
+        holder.txtAmount.setText("Rs. " + currentItem.getAmount());
+        holder.txtDate.setText(currentItem.getDate());
+        holder.txtCategory.setText(currentItem.getCategory());
 
-        String category = transaction.getCategory();
-        String type = transaction.getType();
-
-        // 1. Icon Logic: Category ke mutabiq icon set karna
-        // Zaroori hai ke aapke drawable folder mein yeh files (google_food.png, etc.) maujood hon.
-        if (category.equalsIgnoreCase("Food")) {
-            holder.imgCategory.setImageResource(R.drawable.resturant_icon_removebg_preview);
-        } else if (category.equalsIgnoreCase("Transport")) {
-            holder.imgCategory.setImageResource(R.drawable.bus_icon_removebg_preview);
-        } else if (category.equalsIgnoreCase("Salary")) {
-            holder.imgCategory.setImageResource(R.drawable.icom_icon_removebg_preview);
+        // Set text color based on type
+        int color;
+        Context context = holder.itemView.getContext();
+        if (currentItem.getType().equals("Income")) {
+            // Use a green color resource for Income
+            color = context.getResources().getColor(android.R.color.holo_green_dark);
         } else {
-            // Default icon for Shopping, Education, Other
-            holder.imgCategory.setImageResource(R.drawable.catagorie_icon_removebg_preview);
+            // Use a red color resource for Expense
+            color = context.getResources().getColor(android.R.color.holo_red_dark);
         }
+        holder.txtAmount.setTextColor(color);
 
-        // 2. Color Logic: Income/Expense ke mutabiq color set karna
-        if (type.equalsIgnoreCase("Income")) {
-            holder.textAmount.setTextColor(Color.parseColor("#008000")); // Green
-        } else {
-            holder.textAmount.setTextColor(Color.parseColor("#D80000")); // Red
-        }
-
-        // Agar aapne delete feature implement kiya hai:
-        // holder.itemView.setOnLongClickListener(v -> {
-        //     listener.onItemLongClick(transaction.getId());
-        //     return true;
-        // });
+        // Long click listener for Edit/Delete Popup Menu
+        holder.itemView.setOnLongClickListener(v -> {
+            if (listener != null) {
+                listener.onItemLongClick(currentItem, v);
+                return true;
+            }
+            return false;
+        });
     }
 
     @Override
@@ -76,17 +67,19 @@ public class TransactionAdapter extends RecyclerView.Adapter<TransactionAdapter.
         return transactionList.size();
     }
 
-    // ViewHolder class: TextViews aur ImageView ko initialize karna
-    public static class ViewHolder extends RecyclerView.ViewHolder {
-        public TextView textTitle, textAmount, textCategory;
-        public ImageView imgCategory;
+    public static class TransactionViewHolder extends RecyclerView.ViewHolder {
+        public TextView txtTitle;
+        public TextView txtAmount;
+        public TextView txtDate;
+        public TextView txtCategory;
 
-        public ViewHolder(@NonNull View itemView) {
+        public TransactionViewHolder(@NonNull View itemView) {
             super(itemView);
-            textTitle = itemView.findViewById(R.id.textTitle);
-            textAmount = itemView.findViewById(R.id.textAmount);
-            textCategory = itemView.findViewById(R.id.textCategory);
-            imgCategory = itemView.findViewById(R.id.imgCategory);
+            // Ensure these IDs match those in row_transaction.xml
+            txtTitle = itemView.findViewById(R.id.txtTitle);
+            txtAmount = itemView.findViewById(R.id.txtAmount);
+            txtDate = itemView.findViewById(R.id.txtDate);
+            txtCategory = itemView.findViewById(R.id.txtCategory);
         }
     }
 }

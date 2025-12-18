@@ -1,9 +1,15 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Base application theme. -->
-    <style name="Base.Theme.ExpenseTracker" parent="Theme.Material3.DayNight.NoActionBar">
-        <!-- Customize your light theme here. -->
-        <!-- <item name="colorPrimary">@color/my_light_primary</item> -->
+
+    <!-- Base theme -->
+    <style name="Base.Theme.ExpenseTracker" parent="Theme.Material3.DayNight.NoActionBar" />
+
+    <!-- Main app theme -->
+    <style name="Theme.ExpenseTracker" parent="Base.Theme.ExpenseTracker" />
+
+    <!-- Splash theme -->
+    <style name="Theme.ExpenseTracker.Splash" parent="Base.Theme.ExpenseTracker">
+        <!-- optional window background -->
+        <!-- <item name="android:windowBackground">@color/black</item> -->
     </style>
 
-    <style name="Theme.ExpenseTracker" parent="Base.Theme.ExpenseTracker" />
 </resources>

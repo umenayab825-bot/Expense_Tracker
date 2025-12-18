@@ -1,3 +1,5 @@
+// settings.gradle.kts
+
 pluginManagement {
     repositories {
         google {
@@ -9,6 +11,8 @@ pluginManagement {
         }
         mavenCentral()
         gradlePluginPortal()
+        // JitPack for MPAndroidChart dependencies/plugins
+        maven("https://jitpack.io") // <--- YAHAN ADD KAR DIYA HAI
     }
 }
 dependencyResolutionManagement {
@@ -16,9 +20,10 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // JitPack repository for MPAndroidChart library
+        maven("https://jitpack.io") // <--- YAHAN ALREADY MAUJOOD THA
     }
 }
 
 rootProject.name = "Expense Tracker"
 include(":app")
- 

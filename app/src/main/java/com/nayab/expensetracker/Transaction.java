@@ -2,14 +2,13 @@ package com.nayab.expensetracker;
 
 public class Transaction {
     private int id;
-    private String type; // Income ya Expense
+    private String type;
     private String title;
     private int amount;
     private String category;
     private String date;
     private String note;
 
-    // Constructor
     public Transaction(int id, String type, String title, int amount, String category, String date, String note) {
         this.id = id;
         this.type = type;
@@ -20,7 +19,7 @@ public class Transaction {
         this.note = note;
     }
 
-    // Getters (Data read karne ke liye)
+    // Getters (Zaroori hain)
     public int getId() { return id; }
     public String getType() { return type; }
     public String getTitle() { return title; }
@@ -28,4 +27,8 @@ public class Transaction {
     public String getCategory() { return category; }
     public String getDate() { return date; }
     public String getNote() { return note; }
+
+    // Setters (Agar zaroorat ho to)
+    public void setTitle(String title) { this.title = title; }
+    public void setAmount(int amount) { this.amount = amount; }
 }
