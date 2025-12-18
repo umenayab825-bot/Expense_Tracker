@@ -19,7 +19,6 @@ import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
-// *** CHART IMPORTS ***
 import com.github.mikephil.charting.charts.BarChart;
 import com.github.mikephil.charting.data.BarData;
 import com.github.mikephil.charting.data.BarDataSet;
@@ -46,19 +45,24 @@ import android.content.SharedPreferences;
 
 public class MainActivity extends AppCompatActivity implements TransactionAdapter.OnItemLongClickListener {
 
-    private static final int PERMISSION_REQUEST_CODE = 100; // Request code for storage permission
+    private static final int PERMISSION_REQUEST_CODE = 100;
+
     private Databasehelper dbHelper;
     private TransactionAdapter adapter;
     private ArrayList<Transaction> transactionList;
-    private TextView txtBalance; // TextView to show total balance
-    private BarChart monthlyBarChart; // Bar chart for monthly expenses
+    private TextView txtBalance;
+    private BarChart monthlyBarChart;
+
+    private int income;
+    private int expenseLimit;
+    private int savingAmount;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        // Check if budget is set for first time
+        // Check budget for first time
         checkFirstTimeBudget();
 
         dbHelper = new Databasehelper(this);
@@ -76,32 +80,34 @@ public class MainActivity extends AppCompatActivity implements TransactionAdapte
         adapter = new TransactionAdapter(transactionList, this);
         recyclerView.setAdapter(adapter);
 
-        // Load transactions and update UI
+        // Load saved budget values
+        SharedPreferences prefs = getSharedPreferences("budget_prefs", MODE_PRIVATE);
+        income = prefs.getInt("income", 0);
+        expenseLimit = prefs.getInt("expenseLimit", 0);
+        savingAmount = prefs.getInt("saving", 0);
+
+        // Load transactions
         refreshData();
 
-        // Add transaction button click
+        // Add transaction
         btnAdd.setOnClickListener(v -> showAddEditDialog(null));
 
-        // Export button click
+        // Export transactions
         btnExport.setOnClickListener(v -> checkPermissionAndExport());
 
-        // Dark mode switch listener (currently only shows a Toast)
-        switchDarkMode.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            Toast.makeText(MainActivity.this, isChecked ? "Dark Mode ON" : "Dark Mode OFF", Toast.LENGTH_SHORT).show();
-        });
+        // Dark mode (just toast)
+        switchDarkMode.setOnCheckedChangeListener((buttonView, isChecked) ->
+                Toast.makeText(MainActivity.this, isChecked ? "Dark Mode ON" : "Dark Mode OFF", Toast.LENGTH_SHORT).show());
     }
 
-    // Check if the user has set the budget for the first time
     private void checkFirstTimeBudget() {
         SharedPreferences prefs = getSharedPreferences("budget_prefs", MODE_PRIVATE);
         boolean isSet = prefs.getBoolean("budget_set", false);
-
         if (!isSet) {
             showBudgetDialog();
         }
     }
 
-    // Show dialog to set monthly budget
     private void showBudgetDialog() {
         View view = getLayoutInflater().inflate(R.layout.dialog_budget, null);
 
@@ -114,16 +120,15 @@ public class MainActivity extends AppCompatActivity implements TransactionAdapte
                 .setCancelable(false)
                 .setView(view)
                 .setPositiveButton("Save", (dialog, which) -> {
-                    int income = Integer.parseInt(edtIncome.getText().toString());
+                    income = Integer.parseInt(edtIncome.getText().toString());
                     int expenseP = Integer.parseInt(edtExpensePercent.getText().toString());
                     int savingP = Integer.parseInt(edtSavingPercent.getText().toString());
 
-                    int expenseLimit = income * expenseP / 100;
-                    int savingAmount = income * savingP / 100;
+                    expenseLimit = income * expenseP / 100;
+                    savingAmount = income * savingP / 100;
 
                     SharedPreferences.Editor editor =
                             getSharedPreferences("budget_prefs", MODE_PRIVATE).edit();
-
                     editor.putInt("income", income);
                     editor.putInt("expenseLimit", expenseLimit);
                     editor.putInt("saving", savingAmount);
@@ -133,66 +138,13 @@ public class MainActivity extends AppCompatActivity implements TransactionAdapte
                 .show();
     }
 
-    // --- CHART DATA LOADING ---
-    private void loadMonthlyChartData() {
-        SQLiteDatabase db = dbHelper.getReadableDatabase();
-
-        // Query to get top 5 expense categories
-        String query = "SELECT " + Databasehelper.COL_CATEGORY + ", SUM(" + Databasehelper.COL_AMOUNT + ") " +
-                "FROM " + Databasehelper.TABLE_NAME +
-                " WHERE " + Databasehelper.COL_TYPE + " = 'Expense' " +
-                "GROUP BY " + Databasehelper.COL_CATEGORY +
-                " ORDER BY SUM(" + Databasehelper.COL_AMOUNT + ") DESC LIMIT 5";
-
-        Cursor cursor = db.rawQuery(query, null);
-
-        ArrayList<BarEntry> entries = new ArrayList<>();
-        ArrayList<String> categoryLabels = new ArrayList<>();
-
-        int xPos = 0;
-        if (cursor.moveToFirst()) {
-            do {
-                String category = cursor.getString(0);
-                float totalAmount = cursor.getFloat(1);
-
-                entries.add(new BarEntry(xPos, totalAmount));
-                categoryLabels.add(category);
-                xPos++;
-            } while (cursor.moveToNext());
-        }
-        cursor.close();
-
-        // Setup chart dataset
-        BarDataSet dataSet = new BarDataSet(entries, "Expense by Category");
-        dataSet.setColors(ColorTemplate.MATERIAL_COLORS);
-        dataSet.setValueTextSize(10f);
-
-        BarData barData = new BarData(dataSet);
-        monthlyBarChart.setData(barData);
-
-        // Configure X-axis labels
-        monthlyBarChart.getXAxis().setValueFormatter(new IndexAxisValueFormatter(categoryLabels));
-        monthlyBarChart.getXAxis().setGranularity(1f);
-        monthlyBarChart.getXAxis().setDrawGridLines(false);
-        monthlyBarChart.getXAxis().setLabelCount(categoryLabels.size());
-        monthlyBarChart.getXAxis().setPosition(com.github.mikephil.charting.components.XAxis.XAxisPosition.BOTTOM);
-
-        monthlyBarChart.getDescription().setEnabled(false);
-        monthlyBarChart.setFitBars(true);
-        monthlyBarChart.animateY(1000);
-        monthlyBarChart.getLegend().setEnabled(true);
-
-        monthlyBarChart.invalidate(); // Refresh chart
-    }
-
-    // --- DATA REFRESHING AND BALANCE CALCULATION ---
     private void refreshData() {
         SQLiteDatabase db = dbHelper.getReadableDatabase();
         transactionList.clear();
+
         int totalIncome = 0;
         int totalExpense = 0;
 
-        // Load all transactions from DB
         Cursor cursor = db.query(Databasehelper.TABLE_NAME, null, null, null, null, null, Databasehelper.COL_ID + " DESC");
 
         if (cursor.moveToFirst()) {
@@ -205,33 +157,72 @@ public class MainActivity extends AppCompatActivity implements TransactionAdapte
                 String date = cursor.getString(cursor.getColumnIndexOrThrow(Databasehelper.COL_DATE));
                 String note = cursor.getString(cursor.getColumnIndexOrThrow(Databasehelper.COL_NOTE));
 
-                Transaction transaction = new Transaction(id, type, title, amount, category, date, note);
-                transactionList.add(transaction);
+                Transaction t = new Transaction(id, type, title, amount, category, date, note);
+                transactionList.add(t);
 
-                if (type.equals("Income")) {
-                    totalIncome += amount;
-                } else if (type.equals("Expense")) {
-                    totalExpense += amount;
-                }
+                if (type.equals("Income")) totalIncome += amount;
+                else if (type.equals("Expense")) totalExpense += amount;
+
             } while (cursor.moveToNext());
         }
-
-        int total = totalIncome - totalExpense;
         cursor.close();
 
-        // Update balance TextView
-        txtBalance.setText("Rs. " + total);
+        int totalBalance = totalIncome - totalExpense;
+        txtBalance.setText("Rs. " + totalBalance);
         adapter.notifyDataSetChanged();
 
-        // Refresh chart
         loadMonthlyChartData();
     }
 
-    // --- CRUD DIALOG HANDLING ---
+    private void loadMonthlyChartData() {
+        SQLiteDatabase db = dbHelper.getReadableDatabase();
+
+        String query = "SELECT " + Databasehelper.COL_CATEGORY + ", SUM(" + Databasehelper.COL_AMOUNT + ") " +
+                "FROM " + Databasehelper.TABLE_NAME +
+                " WHERE " + Databasehelper.COL_TYPE + "='Expense' " +
+                "GROUP BY " + Databasehelper.COL_CATEGORY +
+                " ORDER BY SUM(" + Databasehelper.COL_AMOUNT + ") DESC LIMIT 5";
+
+        Cursor cursor = db.rawQuery(query, null);
+
+        ArrayList<BarEntry> entries = new ArrayList<>();
+        ArrayList<String> labels = new ArrayList<>();
+        int x = 0;
+        if (cursor.moveToFirst()) {
+            do {
+                String category = cursor.getString(0);
+                float total = cursor.getFloat(1);
+                entries.add(new BarEntry(x, total));
+                labels.add(category);
+                x++;
+            } while (cursor.moveToNext());
+        }
+        cursor.close();
+
+        BarDataSet dataSet = new BarDataSet(entries, "Expense by Category");
+        dataSet.setColors(ColorTemplate.MATERIAL_COLORS);
+        dataSet.setValueTextSize(10f);
+
+        BarData barData = new BarData(dataSet);
+        monthlyBarChart.setData(barData);
+
+        monthlyBarChart.getXAxis().setValueFormatter(new IndexAxisValueFormatter(labels));
+        monthlyBarChart.getXAxis().setGranularity(1f);
+        monthlyBarChart.getXAxis().setDrawGridLines(false);
+        monthlyBarChart.getXAxis().setLabelCount(labels.size());
+        monthlyBarChart.getXAxis().setPosition(com.github.mikephil.charting.components.XAxis.XAxisPosition.BOTTOM);
+
+        monthlyBarChart.getDescription().setEnabled(false);
+        monthlyBarChart.setFitBars(true);
+        monthlyBarChart.animateY(1000);
+        monthlyBarChart.getLegend().setEnabled(true);
+
+        monthlyBarChart.invalidate();
+    }
+
     private void showAddEditDialog(Transaction transaction) {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        LayoutInflater inflater = getLayoutInflater();
-        View dialogView = inflater.inflate(R.layout.dialog_add_edit, null);
+        View dialogView = getLayoutInflater().inflate(R.layout.dialog_add_edit, null);
         builder.setView(dialogView);
 
         EditText editTitle = dialogView.findViewById(R.id.editTitle);
@@ -243,14 +234,8 @@ public class MainActivity extends AppCompatActivity implements TransactionAdapte
         Button btnSave = dialogView.findViewById(R.id.btnSave);
         TextView txtDialogTitle = dialogView.findViewById(R.id.txtDialogTitle);
 
-        // Set dialog title based on add/edit
-        if (transaction == null) {
-            txtDialogTitle.setText("Add New Transaction");
-        } else {
-            txtDialogTitle.setText("Edit Transaction");
-        }
+        txtDialogTitle.setText(transaction == null ? "Add New Transaction" : "Edit Transaction");
 
-        // Setup spinners
         ArrayAdapter<CharSequence> typeAdapter = ArrayAdapter.createFromResource(this, R.array.transaction_types, android.R.layout.simple_spinner_item);
         typeAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spinnerType.setAdapter(typeAdapter);
@@ -259,38 +244,33 @@ public class MainActivity extends AppCompatActivity implements TransactionAdapte
         categoryAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         spinnerCategory.setAdapter(categoryAdapter);
 
-        // Date picker for transaction date
         final Calendar calendar = Calendar.getInstance();
         editDate.setOnClickListener(v -> {
             DatePickerDialog datePickerDialog = new DatePickerDialog(MainActivity.this,
-                    (view, year, monthOfYear, dayOfMonth) -> {
-                        calendar.set(year, monthOfYear, dayOfMonth);
+                    (view, year, month, dayOfMonth) -> {
+                        calendar.set(year, month, dayOfMonth);
                         SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy", Locale.US);
                         editDate.setText(sdf.format(calendar.getTime()));
                     }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), calendar.get(Calendar.DAY_OF_MONTH));
             datePickerDialog.show();
         });
 
-        // If editing, populate existing data
         if (transaction != null) {
             editTitle.setText(transaction.getTitle());
             editAmount.setText(String.valueOf(transaction.getAmount()));
             editDate.setText(transaction.getDate());
             editNote.setText(transaction.getNote());
 
-            if (transaction.getType().equals("Income")) {
-                spinnerType.setSelection(typeAdapter.getPosition("Income"));
-            } else {
-                spinnerType.setSelection(typeAdapter.getPosition("Expense"));
-            }
+            spinnerType.setSelection(typeAdapter.getPosition(transaction.getType()));
             spinnerCategory.setSelection(categoryAdapter.getPosition(transaction.getCategory()));
         } else {
-            // Set current date for new transaction
             SimpleDateFormat sdf = new SimpleDateFormat("dd-MM-yyyy", Locale.US);
             editDate.setText(sdf.format(calendar.getTime()));
         }
 
+        // ✅ Only ONE dialog variable
         AlertDialog dialog = builder.create();
+
         btnSave.setOnClickListener(v -> {
             String title = editTitle.getText().toString();
             String amountStr = editAmount.getText().toString();
@@ -306,7 +286,35 @@ public class MainActivity extends AppCompatActivity implements TransactionAdapte
 
             int amount = Integer.parseInt(amountStr);
 
-            // Add or update transaction
+            if (type.equals("Expense")) {
+                SQLiteDatabase db = dbHelper.getReadableDatabase();
+                Cursor c = db.rawQuery(
+                        "SELECT SUM(" + Databasehelper.COL_AMOUNT + ") FROM " +
+                                Databasehelper.TABLE_NAME +
+                                " WHERE " + Databasehelper.COL_TYPE + "='Expense'", null);
+
+                int totalExpense = 0;
+                if (c.moveToFirst() && !c.isNull(0)) totalExpense = c.getInt(0);
+                c.close();
+
+                int remainingExpenseLimit = expenseLimit - totalExpense;
+                int remainingSaving = savingAmount - Math.max(0, totalExpense - expenseLimit);
+
+                if (amount <= remainingExpenseLimit) {
+                    // OK
+                } else if (amount <= remainingExpenseLimit + remainingSaving) {
+                    Toast.makeText(this,
+                            "⚠️ Expense limit exceeded!\nUsing saving. Remaining saving: Rs. " +
+                                    (remainingSaving - amount + remainingExpenseLimit),
+                            Toast.LENGTH_LONG).show();
+                } else {
+                    Toast.makeText(this,
+                            "❌ Salary and saving exhausted!\nExpense cannot be added.",
+                            Toast.LENGTH_LONG).show();
+                    return;
+                }
+            }
+
             if (transaction == null) {
                 dbHelper.addTransaction(type, title, amount, category, date, note);
             } else {
@@ -314,71 +322,54 @@ public class MainActivity extends AppCompatActivity implements TransactionAdapte
             }
 
             refreshData();
-
-            // Check if expense exceeds limit
-            if (type.equals("Expense")) {
-                checkExpenseLimit();
-            }
-
             dialog.dismiss();
         });
 
         dialog.show();
     }
 
-    // --- EXPENSE LIMIT CHECK ---
-    private void checkExpenseLimit() {
-        SharedPreferences prefs = getSharedPreferences("budget_prefs", MODE_PRIVATE);
-        int expenseLimit = prefs.getInt("expenseLimit", 0);
-        int savingAmount = prefs.getInt("saving", 0);
 
+
+
+
+    private void checkExpenseLimit() {
         SQLiteDatabase db = dbHelper.getReadableDatabase();
         Cursor c = db.rawQuery(
-                "SELECT SUM(" + Databasehelper.COL_AMOUNT + ") FROM "
-                        + Databasehelper.TABLE_NAME +
+                "SELECT SUM(" + Databasehelper.COL_AMOUNT + ") FROM " +
+                        Databasehelper.TABLE_NAME +
                         " WHERE " + Databasehelper.COL_TYPE + "='Expense'", null);
 
         int totalExpense = 0;
-        if (c.moveToFirst() && !c.isNull(0)) {
-            totalExpense = c.getInt(0);
-        }
+        if (c.moveToFirst() && !c.isNull(0)) totalExpense = c.getInt(0);
         c.close();
 
-        int remainingExpense = expenseLimit - totalExpense;
-        int remainingSaving = savingAmount - (totalExpense - expenseLimit);
+        if (totalExpense <= expenseLimit) return;
 
-        // Show warnings if limits exceeded
-        if (totalExpense > expenseLimit) {
+        int excess = totalExpense - expenseLimit;
+        int remainingSaving = savingAmount - excess;
+
+        if (remainingSaving > 0) {
             Toast.makeText(this,
-                    "⚠️ Expense limit cross ho chuki hai!\nSaving use ho rahi hai!",
+                    "⚠️ Expense limit exceeded!\nRemaining saving: Rs. " + remainingSaving,
                     Toast.LENGTH_LONG).show();
-        }
-
-        if (remainingSaving > 0 && totalExpense > expenseLimit) {
+        } else {
             Toast.makeText(this,
-                    "Ab sirf Rs. " + remainingSaving + " saving reh gayi hai",
-                    Toast.LENGTH_LONG).show();
-        }
-
-        if (remainingSaving <= 0 && totalExpense > expenseLimit) {
-            Toast.makeText(this,
-                    "❌ Aap ne poori saving bhi khatam kar di hai!",
+                    "❌ All savings exhausted!",
                     Toast.LENGTH_LONG).show();
         }
     }
 
-    // --- LONG CLICK POPUP MENU ---
+
     @Override
     public void onItemLongClick(Transaction transaction, View view) {
         PopupMenu popup = new PopupMenu(this, view);
         popup.getMenuInflater().inflate(R.menu.menu_options, popup.getMenu());
-
         popup.setOnMenuItemClickListener(item -> {
-            int itemId = item.getItemId();
-            if (itemId == R.id.action_edit) {
+            int id = item.getItemId();
+            if (id == R.id.action_edit) {
                 showAddEditDialog(transaction);
                 return true;
-            } else if (itemId == R.id.action_delete) {
+            } else if (id == R.id.action_delete) {
                 confirmDelete(transaction.getId());
                 return true;
             }
@@ -387,7 +378,6 @@ public class MainActivity extends AppCompatActivity implements TransactionAdapte
         popup.show();
     }
 
-    // Confirm deletion of transaction
     private void confirmDelete(int id) {
         new AlertDialog.Builder(this)
                 .setTitle("Delete Transaction")
@@ -395,18 +385,15 @@ public class MainActivity extends AppCompatActivity implements TransactionAdapte
                 .setPositiveButton("Yes", (dialog, which) -> {
                     dbHelper.deleteTransaction(id);
                     refreshData();
-                    Toast.makeText(MainActivity.this, "Transaction Deleted", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(this, "Transaction Deleted", Toast.LENGTH_SHORT).show();
                 })
                 .setNegativeButton("No", null)
                 .show();
     }
 
-    // --- EXPORT LOGIC ---
     private void checkPermissionAndExport() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
-                != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this,
-                    new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, PERMISSION_REQUEST_CODE);
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, PERMISSION_REQUEST_CODE);
         } else {
             exportDataToCSV();
         }
@@ -414,7 +401,6 @@ public class MainActivity extends AppCompatActivity implements TransactionAdapte
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == PERMISSION_REQUEST_CODE) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 exportDataToCSV();
@@ -422,9 +408,9 @@ public class MainActivity extends AppCompatActivity implements TransactionAdapte
                 Toast.makeText(this, "Storage permission denied. Cannot export data.", Toast.LENGTH_SHORT).show();
             }
         }
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
     }
 
-    // Export transaction data to CSV file
     private void exportDataToCSV() {
         if (!isExternalStorageWritable()) {
             Toast.makeText(this, "External storage not writable.", Toast.LENGTH_SHORT).show();
@@ -432,9 +418,7 @@ public class MainActivity extends AppCompatActivity implements TransactionAdapte
         }
 
         File folder = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS);
-        if (!folder.exists()) {
-            folder.mkdirs();
-        }
+        if (!folder.exists()) folder.mkdirs();
 
         String fileName = "expense_tracker_export_" + new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Calendar.getInstance().getTime()) + ".csv";
         File file = new File(folder, fileName);
@@ -456,16 +440,13 @@ public class MainActivity extends AppCompatActivity implements TransactionAdapte
             writer.flush();
             writer.close();
             Toast.makeText(this, "Data exported successfully to Downloads/" + fileName, Toast.LENGTH_LONG).show();
-
         } catch (IOException e) {
             e.printStackTrace();
             Toast.makeText(this, "Export failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
         }
     }
 
-    // Check if external storage is available
     private boolean isExternalStorageWritable() {
-        String state = Environment.getExternalStorageState();
-        return Environment.MEDIA_MOUNTED.equals(state);
+        return Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState());
     }
 }
