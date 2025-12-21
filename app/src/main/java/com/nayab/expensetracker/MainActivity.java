@@ -101,12 +101,21 @@ public class MainActivity extends AppCompatActivity implements TransactionAdapte
     }
 
     private void checkFirstTimeBudget() {
-        SharedPreferences prefs = getSharedPreferences("budget_prefs", MODE_PRIVATE);
-        boolean isSet = prefs.getBoolean("budget_set", false);
+        SharedPreferences userPrefs = getSharedPreferences("user_prefs", MODE_PRIVATE);
+        String email = userPrefs.getString("logged_in_email", "");
+
+        if (email.isEmpty()) return;
+
+        SharedPreferences budgetPrefs = getSharedPreferences("budget_prefs", MODE_PRIVATE);
+
+        // 🔑 Email specific key
+        boolean isSet = budgetPrefs.getBoolean("budget_set_" + email, false);
+
         if (!isSet) {
             showBudgetDialog();
         }
     }
+
 
     private void showBudgetDialog() {
         View view = getLayoutInflater().inflate(R.layout.dialog_budget, null);
@@ -132,7 +141,11 @@ public class MainActivity extends AppCompatActivity implements TransactionAdapte
                     editor.putInt("income", income);
                     editor.putInt("expenseLimit", expenseLimit);
                     editor.putInt("saving", savingAmount);
-                    editor.putBoolean("budget_set", true);
+                    SharedPreferences userPrefs = getSharedPreferences("user_prefs", MODE_PRIVATE);
+                    String email = userPrefs.getString("logged_in_email", "");
+
+                    editor.putBoolean("budget_set_" + email, true);
+
                     editor.apply();
                 })
                 .show();

@@ -27,12 +27,17 @@ public class LoginActivity extends AppCompatActivity {
             String email = editEmail.getText().toString().trim();
             String password = editPassword.getText().toString().trim();
 
-            if(email.isEmpty() || password.isEmpty()) {
+            if (email.isEmpty() || password.isEmpty()) {
                 Toast.makeText(LoginActivity.this, "Please enter email & password", Toast.LENGTH_SHORT).show();
                 return;
             }
 
-            // ✅ No hardcoded email/password → anyone can login
+            // ✅ SAVE LOGGED IN EMAIL
+            getSharedPreferences("user_prefs", MODE_PRIVATE)
+                    .edit()
+                    .putString("logged_in_email", email)
+                    .apply();
+
             Intent intent = new Intent(LoginActivity.this, MainActivity.class);
             startActivity(intent);
             finish();
