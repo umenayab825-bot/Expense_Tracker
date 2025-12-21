@@ -17,10 +17,8 @@ public class LoginActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // Make sure your layout file is exactly named "activity_login.xml"
         setContentView(R.layout.activity_login);
 
-        // IDs must exactly match with activity_login.xml
         editEmail = findViewById(R.id.editEmail);
         editPassword = findViewById(R.id.editPassword);
         btnLogin = findViewById(R.id.btnLogin);
@@ -34,16 +32,10 @@ public class LoginActivity extends AppCompatActivity {
                 return;
             }
 
-            // Hardcoded credentials
-            if(email.equals("user@example.com") && password.equals("12345")) {
-                // Login successful → go to MainActivity
-                Intent intent = new Intent(LoginActivity.this, MainActivity.class);
-                startActivity(intent);
-                finish();
-            } else {
-                // Login failed
-                Toast.makeText(LoginActivity.this, "Invalid email or password", Toast.LENGTH_SHORT).show();
-            }
+            // ✅ No hardcoded email/password → anyone can login
+            Intent intent = new Intent(LoginActivity.this, MainActivity.class);
+            startActivity(intent);
+            finish();
         });
     }
 }
