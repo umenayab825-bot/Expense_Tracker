@@ -39,17 +39,34 @@
         android:text="Current Balance"
         android:textColor="#FFFFFF"
         android:textSize="18sp" />
+            <Button
+                android:id="@+id/btnEditBudget"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Edit Budget"
+                android:layout_marginTop="8dp"/>
 
-    <TextView
-        android:id="@+id/txtBalance"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Rs. 0.00"
-        android:textColor="#FFFFFF"
-        android:textSize="32sp"
-        android:textStyle="bold"
-        android:layout_marginTop="8dp" />
-</LinearLayout>
+
+            <TextView
+                android:id="@+id/txtBalance"
+                android:layout_width="136dp"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Rs. 0.00"
+                android:textColor="#FFFFFF"
+                android:textSize="25sp"
+                android:textStyle="bold" />
+            <TextView
+                android:id="@+id/txtRemainingSaving"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Remaining Saving: Rs. 0"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="@android:color/holo_green_dark"
+                android:layout_marginTop="8dp"/>
+
+        </LinearLayout>
 </androidx.cardview.widget.CardView>
 
     <androidx.cardview.widget.CardView
